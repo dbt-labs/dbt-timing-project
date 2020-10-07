@@ -1,0 +1,4 @@
+
+networkx>=2.3,<3
+PyYAML>=3.11
+snakeviz

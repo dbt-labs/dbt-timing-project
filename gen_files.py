@@ -45,7 +45,7 @@ def gen_sql(edges):
 
 
 G = nx.gnc_graph(GRAPH_SIZE, seed=526)
-for node_id, node in G.node.items():
+for node_id, node in G.nodes.items():
     node_name = gen_name(node_id)
 
     schema = gen_schema(node_name)
