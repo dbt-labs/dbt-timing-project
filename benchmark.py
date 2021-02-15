@@ -100,24 +100,12 @@ def print_results(args, dev, base):
     print(' - absolute times in seconds - ')
     print()
     print(f"raw data: dev_runs: {dev}")
-    print(f"raw data: dev_runs: {base}")
+    print(f"raw data: base_runs: {base}")
     print()
     print_stat('mean', mean(dev), mean(base))
     print_stat('median', median(dev), median(base))
     print_stat('mean without outliers', mean(dev_no_outliers), mean(base_no_outliers))
     print_stat('median without outliers', median(dev_no_outliers), median(base_no_outliers))
-
-# Stream the output to stdout as the command is running
-def stream_output(cmd, cwd=None):
-    try:
-        subprocess.run(cmd, cwd=cwd, check=True, stdout=None, stderr=None)
-    except subprocess.CalledProcessError as exc:
-        print(f"Command {exc.cmd} failed")
-        if exc.output:
-            print(exc.output.decode("utf-8"))
-        if exc.stderr:
-            print(exc.stderr.decode("utf-8"), file=sys.stderr)
-        raise
 
 def main():
     # parse command line arguments
