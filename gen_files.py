@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-GRAPH_SIZE = 100
+import sys
 
 import networkx as nx
 import yaml
@@ -43,25 +42,34 @@ def gen_sql(edges):
         contents += "select * from {{ ref('" + edge_name + "') }}"
     return contents
 
-
-G = nx.gnc_graph(GRAPH_SIZE, seed=526)
-for node_id, node in G.nodes.items():
-    node_name = gen_name(node_id)
-
-    schema = gen_schema(node_name)
-    contents = gen_sql(G.edges(node_id))
-    path_dir = "path_{}".format(node_id // 10)
-    path = "models/{}/{}.{}"
-    model_path = path.format(path_dir, node_name, 'sql')
-    test_path = path.format(path_dir, node_name, 'yml')
-
+def main():
     try:
-        os.makedirs("models/{}".format(path_dir))
-    except FileExistsError:
-        pass
+        GRAPH_SIZE = int(sys.argv[1])
+    except:
+        print("takes one integer argument for graph size")
+        return
 
-    with open(model_path, 'w') as fh:
-        fh.write(contents)
+    G = nx.gnc_graph(GRAPH_SIZE, seed=526)
+    for node_id, node in G.nodes.items():
+        node_name = gen_name(node_id)
 
-    with open(test_path, 'w') as fh:
-        fh.write(yaml.dump(schema))
+        schema = gen_schema(node_name)
+        contents = gen_sql(G.edges(node_id))
+        path_dir = "path_{}".format(node_id // 10)
+        path = "models/{}/{}.{}"
+        model_path = path.format(path_dir, node_name, 'sql')
+        test_path = path.format(path_dir, node_name, 'yml')
+
+        try:
+            os.makedirs("models/{}".format(path_dir))
+        except FileExistsError:
+            pass
+
+        with open(model_path, 'w') as fh:
+            fh.write(contents)
+
+        with open(test_path, 'w') as fh:
+            fh.write(yaml.dump(schema))
+
+if __name__ == "__main__":
+    main()
