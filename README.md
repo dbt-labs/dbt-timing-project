@@ -1,11 +1,18 @@
 
 ### dbt timing project
+Creates a project with the specified number of models and tests. Intended for performance testing dbt core.
 
-run with:
-
+## Usage
 ```
-python3 gen_files.py
+python3 gen_files.py <graph-size>
 ```
 
-to create a project with a specified number of models and tests.
-Intended for performance testing in dbt Core.
+for small projects consider 
+```
+python3 gen_files.py 100
+```
+
+for large projects consider
+```
+python3 gen_files.py 2000
+```
