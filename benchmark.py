@@ -116,7 +116,7 @@ def main():
 
     # hard coding number of runs to compare
     # will splode if less than 3.
-    args['runs'] = 10
+    args['runs'] = 3
 
     # directory names
     workspace_dir = 'target'
@@ -155,34 +155,23 @@ def main():
         os.system(f"cd {dev_path} && python3 -m venv env")
         os.system(f"cd {base_path} && python3 -m venv env")
 
-    ### Run Dev ###
+    # install branches
     if not args['cached']:
         print('benchmark.py: installing dev branch')
-        # install branch
         os.system(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
+        print('benchmark.py: installing base branch')
+        os.system(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
     
     # define thunks that run the dbt command when evaluated
     dev_thunk = lambda : os.system(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args['cmd']}")
+    base_thunk = lambda : os.system(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args['cmd']}")
 
     # complete the runs (this is what takes so long)
     print('benchmark.py: running dev branch')
     dev_runs = list(map(time, [dev_thunk] * args['runs']))
-    ### End Dev ###
-
-    ### Run Base ###
-    if not args['cached']:
-        print('benchmark.py: installing base branch')
-        # install branch
-        os.system(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
-
-    # define thunks that run the dbt command when evaluated
-    base_thunk = lambda : os.system(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args['cmd']}")
-
-    # complete the runs (this is what takes so long)
     print('benchmark.py: running base branch')
     base_runs = list(map(time, [base_thunk] * args['runs']))
-    ### End Base ###
-
+    
     # output timer information and comparison math.
     print_results(args, dev_runs, base_runs)
  
