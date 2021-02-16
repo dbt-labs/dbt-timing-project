@@ -2,6 +2,10 @@
 ### dbt timing project
 This repository contains command line tools to locally generate arbitrarily-sized projects and to compare benchmarks of dbt commands as seen in public github branches.
 
+## Example Output
+
+![](./screenshots/benchmark-screenshot.png)
+
 ## Installation
 
 ```
@@ -46,7 +50,7 @@ optional arguments:
 
 ## Examples
 
-benchmark parse on a small project:
+benchmark `dbt parse` on a small project:
 
 ```
 python3 gen_files.py 10
