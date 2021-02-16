@@ -55,7 +55,7 @@ def main():
     parser = MyParser(description='Generate a dbt project')
     parser.add_argument(
         'files',
-        type=str,
+        type=int,
         help='specifies the number of files to be generated in the project'
     )
     args = parser.parse_args()
@@ -85,8 +85,8 @@ def main():
         with open(test_path, 'w') as fh:
             fh.write(yaml.dump(schema))
 
-        print("Done.")
-        print()
+    print("Done.")
+    print()
 
 if __name__ == "__main__":
     main()
