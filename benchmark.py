@@ -1,3 +1,4 @@
+import argparse
 from functools import reduce
 import git
 import os
@@ -6,15 +7,13 @@ from statistics import mean, median
 import sys
 from time import perf_counter
 
-HELP = """
-Usage:
 
-# Shows how much faster `dbt parse` on dbt/my-dev-branch is compared to dbt/other-branch
-benchmark parse my-dev-branch other-branch
-
-# If you want to rerun and skip the install steps
-benchmark --cached parse my-dev-branch other-branch
-"""
+# overrides error behavior for arg parser
+class MyParser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
 
 def create_if_doesnt_exist(path):
     if not os.path.exists(path):
@@ -28,27 +27,37 @@ def remove_and_recreate_dir(path):
         os.mkdir(path)
 
 # returns None if there was an error
-def parse_args(arg_list):
-    arg_len = len(sys.argv) - 1 # remove the program name from arg length
-    if any(map(lambda x: x in ['--help', '-h'], sys.argv)):
-        print(HELP)
-        return None
-    elif arg_len < 3 or arg_len > 4:
-        print('error: requries 3 or 4 args')
-        print(HELP)
-        return None
-    elif arg_len == 4 and sys.argv[1] != '--cached':
-        print('unexpected first argument. did you mean `--cached` ?')
-        print(HELP)
-        return None
-    elif arg_len == 3 and sys.argv[1] == '--cached':
-        print('not enough arguments after `--cached`.')
-        print(HELP)
-        return None
-    elif arg_len == 4 and sys.argv[1] == '--cached':
-        return {'cached': True, 'cmd': sys.argv[2], 'dev': sys.argv[3], 'base': sys.argv[4]}
-    elif arg_len == 3 and sys.argv[1] != '--cached':
-        return {'cached': False, 'cmd': sys.argv[1], 'dev': sys.argv[2], 'base': sys.argv[3]}
+def parse_args():
+    parser = MyParser(description='Benchmark two dbt branches')
+    parser.add_argument(
+        '--cached',
+        '-c',
+        action='store_true',
+        help="skips git clone and install steps."
+    )
+    parser.add_argument(
+        '--runs',
+        type=int,
+        default=10,
+        dest='runs',
+        help="number of runs to test for each branch. defaults to 10."
+    )
+    parser.add_argument(
+        'command',
+        type=str,
+        help='specifies the dbt command to benchmark. run as `dbt <command>`.'
+    )
+    parser.add_argument(
+        'dev',
+        type=str,
+        help='branch with changes to benchmark'
+    )
+    parser.add_argument(
+        'base',
+        type=str,
+        help='branch to compare against. typically "develop"'
+    )
+    return parser.parse_args()
 
 def path_from(dir_list):
     return './' + '/'.join(dir_list)
@@ -84,9 +93,9 @@ def print_results(args, dev, base):
     # print all the stats
     print()
     print('::::::  Benchmark stats  ::::::')
-    print(f"command:     dbt {args['cmd']}")
-    print(f"dev branch:  dbt/{args['dev']}")
-    print(f"base branch: dbt/{args['base']}")
+    print(f"command:     dbt {args.command}")
+    print(f"dev branch:  dbt/{args.dev}")
+    print(f"base branch: dbt/{args.base}")
     print(' - absolute times in seconds - ')
     print()
     print(f"raw data: dev_runs: {dev}")
@@ -97,14 +106,16 @@ def print_results(args, dev, base):
 
 def main():
     # parse command line arguments
-    args = parse_args(sys.argv)
-    # exit if the args weren't parsed
-    if args is None:
+    # exits on error
+    args = parse_args()
+
+    # exit if less than one run requested
+    # (mean and median will throw on empty list inputs)
+    if args.runs < 1:
+        print('benchmark.py: must have at least one run')
         return
 
-    # hard coding number of runs to compare
-    # numbers less than 0 behave like zero
-    args['runs'] = 10
+    print(args)
 
     # directory names
     workspace_dir = 'target'
@@ -116,7 +127,7 @@ def main():
     dev_path = path_from([workspace_dir, dev_dir])
     base_path = path_from([workspace_dir, base_dir])
 
-    if not args['cached']:
+    if not args.cached:
         print('benchmark.py: setting up directories') 
 
         # set up workspace directories
@@ -131,12 +142,12 @@ def main():
         git.Repo.clone_from(
             'git@github.com:fishtown-analytics/dbt',
             dev_path,
-            branch=args['dev']
+            branch=args.dev
         )
         git.Repo.clone_from(
             'git@github.com:fishtown-analytics/dbt',
             base_path,
-            branch=args['base']
+            branch=args.base
         )
 
         # create virtual environments
@@ -144,7 +155,7 @@ def main():
         os.system(f"cd {base_path} && python3 -m venv env")
 
     # upgrade pip and install branches
-    if not args['cached']:
+    if not args.cached:
         # upgrade pip
         os.system(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
         os.system(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
@@ -156,14 +167,14 @@ def main():
         os.system(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
     
     # define thunks that run the dbt command when evaluated
-    dev_thunk = lambda : os.system(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args['cmd']}")
-    base_thunk = lambda : os.system(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args['cmd']}")
+    dev_thunk = lambda : os.system(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
+    base_thunk = lambda : os.system(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
 
     # complete the runs (this is what takes so long)
     print('benchmark.py: running dev branch')
-    dev_runs = list(map(time, [dev_thunk] * args['runs']))
+    dev_runs = list(map(time, [dev_thunk] * args.runs))
     print('benchmark.py: running base branch')
-    base_runs = list(map(time, [base_thunk] * args['runs']))
+    base_runs = list(map(time, [base_thunk] * args.runs))
     
     # output timer information and comparison math.
     print_results(args, dev_runs, base_runs)
