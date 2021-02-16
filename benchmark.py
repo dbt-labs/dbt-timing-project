@@ -232,16 +232,20 @@ def main():
         dev_runs = []
         for thunk in ([dev_thunk] * args.runs):
             log(f"dev run {len(dev_runs)}/{args.runs}")
-            dev_runs = dev_runs + [time(thunk)]
-            remaining = round(mean(dev_runs) * ((2 * args.runs) - len(dev_runs)), 0)
+            run = time(thunk)
+            dev_runs = dev_runs + [run]
+            remaining = int(round(mean(dev_runs) * ((2 * args.runs) - len(dev_runs)), 0))
+            log(f"run completed in {run} seconds")
             log(f"estimated time remaining: {remaining} seconds")
 
         log('running base branch')
         base_runs = []
         for thunk in ([base_thunk] * args.runs):
             log(f"base run {len(base_runs)}/{args.runs}")
-            base_runs = base_runs + [time(thunk)]
-            remaining = round(mean(base_runs) * (args.runs - len(base_runs)), 0)
+            run = time(thunk)
+            base_runs = base_runs + [run]
+            remaining = int(round(mean(base_runs) * (args.runs - len(base_runs)), 0))
+            log(f"run completed in {run} seconds")
             log(f"estimated time remaining: {remaining} seconds")
     
     # output timer information and comparison math.
