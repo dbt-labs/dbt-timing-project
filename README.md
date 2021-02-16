@@ -1,30 +1,63 @@
 
 ### dbt timing project
-This repository contains scripts to generate arbitrarily-sized projects and to benchmark the speed of dbt commands by branch.
+This repository contains command line tools to locally generate arbitrarily-sized projects and to compare benchmarks of dbt commands as seen in public github branches.
 
+## Installation
+
+```
+pip install -r requirements.txt
+```
 
 ## Usage
 
-To generate files:
+1. generate dbt project files
+2. run benchmark.py
 
 ```
-python3 gen_files.py <number of files>
+> python3 gen_files.py --help
+usage: gen_files.py [-h] files
+
+Generate a dbt project
+
+positional arguments:
+  files       specifies the number of files to be generated in the project
+
+optional arguments:
+  -h, --help  show this help message and exit
 ```
 
-example for a very large project:
 ```
-python3 gen_files.py 2000
+> python3 benchmark.py --help 
+usage: benchmark.py [-h] [--cached] [--runs RUNS] command dev base
+
+Benchmark two dbt branches
+
+positional arguments:
+  command       specifies the dbt command to benchmark. run as `dbt
+                <command>`.
+  dev           branch with changes to benchmark
+  base          branch to compare against. typically "develop"
+
+optional arguments:
+  -h, --help    show this help message and exit
+  --cached, -c  skips git clone and install steps.
+  --runs RUNS   number of runs to test for each branch. defaults to 10.
 ```
 
-To benchmark branches:
-You must first generate the size project you would like to benchmark against.
+## Examples
+
+benchmark parse on a small project:
+
 ```
-python3 gen_files.py 2000
-python3 benchmark.py my-branch-name develop
+python3 gen_files.py 10
+python3 benchmark.py parse my-branch develop
 ```
 
-If you've already run the benchmark and would like to run it again without re-cloning the branches and installing use the `--cached` option:
+re-run the same benchmark with 25 runs on each branch:
+
 ```
-python3 benchmark.py --cached my-branch-name develop
+python3 benchmark.py --cached --runs=25 parse my-branch develop
 ```
+
+to benchmark large projects generate ~2000 files.
 
