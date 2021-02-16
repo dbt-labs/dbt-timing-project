@@ -4,6 +4,15 @@ import sys
 import networkx as nx
 import yaml
 import os
+import argparse
+
+
+# overrides error behavior for arg parser
+class MyParser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
 
 def gen_name(i):
     return "node_{}".format(i)
@@ -43,11 +52,16 @@ def gen_sql(edges):
     return contents
 
 def main():
-    try:
-        GRAPH_SIZE = int(sys.argv[1])
-    except:
-        print("takes one integer argument for graph size")
-        return
+    parser = MyParser(description='Generate a dbt project')
+    parser.add_argument(
+        'files',
+        type=str,
+        help='specifies the number of files to be generated in the project'
+    )
+    args = parser.parse_args()
+    GRAPH_SIZE = args.files
+
+    print(":: Generating Files ::")
 
     G = nx.gnc_graph(GRAPH_SIZE, seed=526)
     for node_id, node in G.nodes.items():
@@ -70,6 +84,9 @@ def main():
 
         with open(test_path, 'w') as fh:
             fh.write(yaml.dump(schema))
+
+        print("Done.")
+        print()
 
 if __name__ == "__main__":
     main()
