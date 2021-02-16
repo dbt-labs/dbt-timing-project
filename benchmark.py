@@ -103,7 +103,7 @@ def main():
         return
 
     # hard coding number of runs to compare
-    # will splode if less than 3.
+    # numbers less than 0 behave like zero
     args['runs'] = 10
 
     # directory names
