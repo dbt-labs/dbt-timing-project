@@ -15,6 +15,7 @@ benchmark parse my-dev-branch other-branch
 # If you want to rerun and skip the install steps
 benchmark --cached parse my-dev-branch other-branch
 """
+
 def create_if_doesnt_exist(path):
     if not os.path.exists(path):
         os.mkdir(path)
@@ -75,21 +76,10 @@ def print_stat(name, dev, base):
         print(f'DEGRADED BY: {abs(percent)}%')
     print()
 
-def remove_first_and_last_immutable(list):
-    # avoid list mutation by reference
-    list_copied = list.copy()
-    list_copied.pop(0)
-    list_copied.pop()
-    return list_copied
-
 def print_results(args, dev, base):
     # mutably sort
     dev.sort()
     base.sort()
-
-    # remove outliers
-    dev_no_outliers = remove_first_and_last_immutable(dev)
-    base_no_outliers = remove_first_and_last_immutable(base)
 
     # print all the stats
     print()
@@ -104,8 +94,6 @@ def print_results(args, dev, base):
     print()
     print_stat('mean', mean(dev), mean(base))
     print_stat('median', median(dev), median(base))
-    print_stat('mean without outliers', mean(dev_no_outliers), mean(base_no_outliers))
-    print_stat('median without outliers', median(dev_no_outliers), median(base_no_outliers))
 
 def main():
     # parse command line arguments
@@ -116,7 +104,7 @@ def main():
 
     # hard coding number of runs to compare
     # will splode if less than 3.
-    args['runs'] = 3
+    args['runs'] = 10
 
     # directory names
     workspace_dir = 'target'
@@ -155,8 +143,13 @@ def main():
         os.system(f"cd {dev_path} && python3 -m venv env")
         os.system(f"cd {base_path} && python3 -m venv env")
 
-    # install branches
+    # upgrade pip and install branches
     if not args['cached']:
+        # upgrade pip
+        os.system(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
+        os.system(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
+        
+        # install branches
         print('benchmark.py: installing dev branch')
         os.system(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
         print('benchmark.py: installing base branch')
