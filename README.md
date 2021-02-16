@@ -65,3 +65,5 @@ python3 benchmark.py --cached --runs=25 parse my-branch develop
 
 to benchmark large projects generate ~2000 files.
 
+## Future Improvements
+- when using `--cached` the last two parameters do nothing but are still required. Should check that those names match the cloned repositories.
