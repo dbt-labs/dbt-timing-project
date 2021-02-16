@@ -124,13 +124,13 @@ def get_stat(name, dev, base):
 
     lines = [
         (f"{name} dev", f"{dev}"),
-        (f"{name} dev", f"{base}")
+        (f"{name} base", f"{base}")
     ]
 
     if percent > 0:
-        return lines + [('IMPROVED BY', f"{percent}%"), ("", None)]
+        return lines + [('IMPROVED BY', f"{percent} "), ("", None)]
     else:
-        return lines + [('DEGRADED BY', f"{abs(percent)}%"), ("", None)]
+        return lines + [('DEGRADED BY', f"{abs(percent)} %"), ("", None)]
 
 def gather_output(args, dev, base):
     # mutably sort by reference
@@ -144,9 +144,6 @@ def gather_output(args, dev, base):
         ("base branch", f"dbt/{args.base}"),
         ("", None),
         ("- absolute times in seconds -", None),
-        ("", None),
-        ("raw dev_runs", f"{dev}"),
-        ("raw base_runs", f"{base}"),
         ("", None) 
     ] + get_stat('mean', mean(dev), mean(base)) + get_stat('median', median(dev), median(base))
 
@@ -223,7 +220,13 @@ def main():
         base_runs = list(map(time, [base_thunk] * args.runs))
     
     # output timer information and comparison math.
+    print()
     print_results(gather_output(args, dev_runs, base_runs))
+
+    # print raw runtimes
+    print(f"raw dev_runs:  {dev_runs}")
+    print(f"raw base_runs: {base_runs}")
+    print()
  
 
 if __name__ == '__main__':
