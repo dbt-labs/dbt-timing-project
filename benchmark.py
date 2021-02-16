@@ -231,7 +231,7 @@ def main():
         log('running dev branch')
         dev_runs = []
         for thunk in ([dev_thunk] * args.runs):
-            log(f"dev run {len(dev_runs)}/{args.runs}")
+            log(f"dev run {len(dev_runs) + 1}/{args.runs}")
             run = time(thunk)
             dev_runs = dev_runs + [run]
             remaining = int(round(mean(dev_runs) * ((2 * args.runs) - len(dev_runs)), 0))
@@ -241,7 +241,7 @@ def main():
         log('running base branch')
         base_runs = []
         for thunk in ([base_thunk] * args.runs):
-            log(f"base run {len(base_runs)}/{args.runs}")
+            log(f"base run {len(base_runs) + 1}/{args.runs}")
             run = time(thunk)
             base_runs = base_runs + [run]
             remaining = int(round(mean(base_runs) * (args.runs - len(base_runs)), 0))
