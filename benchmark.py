@@ -143,7 +143,7 @@ def gather_output(args, dev, base):
         ("dev branch", f"dbt/{args.dev}"),
         ("base branch", f"dbt/{args.base}"),
         ("", None),
-        ("- absolute times in seconds -", None),
+        ("time measured in seconds", None),
         ("", None) 
     ] + get_stat('mean', mean(dev), mean(base)) + get_stat('median', median(dev), median(base))
 
