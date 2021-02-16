@@ -145,7 +145,9 @@ def gather_output(args, dev, base):
         ("", None),
         ("time measured in seconds", None),
         ("", None) 
-    ] + get_stat('mean', mean(dev), mean(base)) + get_stat('median', median(dev), median(base))
+    ] \
+        + get_stat('mean', round(mean(dev), 2), round(mean(base), 2)) \
+        + get_stat('median', round(median(dev), 2), round(median(base), 2))
 
 def main():
     # parse command line arguments
