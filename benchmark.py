@@ -1,11 +1,14 @@
 import argparse
+import datetime
 from functools import reduce
 import git
 from math import ceil
 import os
+import subprocess
 from shutil import rmtree
 from statistics import mean, median
 import sys
+import time
 from time import perf_counter
 
 
@@ -149,12 +152,21 @@ def gather_output(args, dev, base):
         + get_stat('mean', round(mean(dev), 2), round(mean(base), 2)) \
         + get_stat('median', round(median(dev), 2), round(median(base), 2))
 
+def subprocess_with_errs(cmd):
+    subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+
+def log(msg):
+    ts = datetime.datetime.now().strftime('%H:%M:%S')
+    print(f"{ts}  {msg}")
+
 def main():
     # parse command line arguments
     # exits on error
     args = parse_args()
 
-    print(args)
+    # print title
+    print()
+    print(':::: Benchmark.py ::::')
 
     # directory names
     workspace_dir = 'target'
@@ -167,15 +179,15 @@ def main():
     base_path = path_from([workspace_dir, base_dir])
 
     if not args.cached:
-        print('benchmark.py: setting up directories') 
+        log('setting up directories') 
 
         # set up workspace directories
         create_if_doesnt_exist(workspace_path)
         remove_and_recreate_dir(dev_path)
         remove_and_recreate_dir(base_path)
 
-        print('benchmark.py: cloning both branches with local identity')
-        print('benchmark.py: may ask for ssh password twice (once for each branch)')
+        log('cloning both branches with local identity')
+        log('may ask for ssh password twice (once for each branch)')
 
         # clone branches
         git.Repo.clone_from(
@@ -190,36 +202,47 @@ def main():
         )
 
         # create virtual environments
-        os.system(f"cd {dev_path} && python3 -m venv env")
-        os.system(f"cd {base_path} && python3 -m venv env")
+        subprocess_with_errs(f"cd {dev_path} && python3 -m venv env")
+        subprocess_with_errs(f"cd {base_path} && python3 -m venv env")
 
     # upgrade pip and install branches
     if not args.cached:
         # upgrade pip
-        os.system(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
-        os.system(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
+        subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
+        subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
         
         # install branches
-        print('benchmark.py: installing dev branch')
-        os.system(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
-        print('benchmark.py: installing base branch')
-        os.system(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
+        log('installing dev branch')
+        subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
+        log('installing base branch')
+        subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
     
     # define thunks that run the dbt command when evaluated
-    dev_thunk = lambda : os.system(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
-    base_thunk = lambda : os.system(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
+    dev_thunk = lambda : subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
+    base_thunk = lambda : subprocess_with_errs(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
 
     # mean and median thow on empty list inputs
     # to speed up development time, allow empty runs as a special case.
     if args.runs < 1:
         dev_runs = [1.0] * 10
         base_runs = [1.0] * 10
+    # complete the runs (this is what takes so long)
     else:
-        # complete the runs (this is what takes so long)
-        print('benchmark.py: running dev branch')
-        dev_runs = list(map(time, [dev_thunk] * args.runs))
-        print('benchmark.py: running base branch')
-        base_runs = list(map(time, [base_thunk] * args.runs))
+        log('running dev branch')
+        dev_runs = []
+        for thunk in ([dev_thunk] * args.runs):
+            log(f"dev run {len(dev_runs)}/{args.runs}")
+            dev_runs = dev_runs + [time(thunk)]
+            remaining = round(mean(dev_runs) * ((2 * args.runs) - len(dev_runs)), 0)
+            log(f"estimated time remaining: {remaining} seconds")
+
+        log('running base branch')
+        base_runs = []
+        for thunk in ([base_thunk] * args.runs):
+            log(f"base run {len(base_runs)}/{args.runs}")
+            base_runs = base_runs + [time(thunk)]
+            remaining = round(mean(base_runs) * (args.runs - len(base_runs)), 0)
+            log(f"estimated time remaining: {remaining} seconds")
     
     # output timer information and comparison math.
     print()
