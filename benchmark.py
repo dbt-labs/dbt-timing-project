@@ -30,6 +30,10 @@ def remove_and_recreate_dir(path):
     else:
         os.mkdir(path)
 
+def remove_if_exists(path):
+    if os.path.exists(path):
+        os.remove(path)
+
 # returns None if there was an error
 def parse_args():
     parser = MyParser(description='Benchmark two dbt branches')
@@ -45,11 +49,6 @@ def parse_args():
         default=10,
         dest='runs',
         help="number of runs to test for each branch. defaults to 10."
-    )
-    parser.add_argument(
-        'command',
-        type=str,
-        help='specifies the dbt command to benchmark. run as `dbt <command>`.'
     )
     parser.add_argument(
         'dev',
@@ -142,12 +141,12 @@ def gather_output(args, dev, base):
 
     # return the list of lines
     return [
-        ("command", f"dbt {args.command}"),
-        ("dev branch", f"dbt/{args.dev}"),
-        ("base branch", f"dbt/{args.base}"),
-        ("", None),
-        ("time measured in seconds", None),
-        ("", None) 
+        ('command', 'dbt parse'),
+        ('dev branch', f"dbt/{args.dev}"),
+        ('base branch', f"dbt/{args.base}"),
+        ('', None),
+        ('time measured in seconds', None),
+        ('', None) 
     ] \
         + get_stat('mean', round(mean(dev), 2), round(mean(base), 2)) \
         + get_stat('median', round(median(dev), 2), round(median(base), 2))
@@ -158,6 +157,35 @@ def subprocess_with_errs(cmd):
 def log(msg):
     ts = datetime.datetime.now().strftime('%H:%M:%S')
     print(f"{ts}  {msg}")
+
+class Branch():
+    def __init__(self, name, setup_thunk, run_thunk, cleanup_thunk, time_remaining):
+        self.name = name
+        self.setup_thunk = setup_thunk
+        self.run_thunk = run_thunk
+        self.cleanup_thunk = cleanup_thunk
+        self.time_remaining = time_remaining
+        self.runs = []
+
+    def run_branch(self, args):
+        log(f"running {self.name} branch setup")
+        self.setup_thunk()
+        # mean and median thow on empty list inputs
+        # to speed up development time, allow empty runs as a special case.
+        if args.runs < 1:
+            self.runs = [1.0] * 10
+            self.runs = [1.0] * 10
+        # complete the runs (this is what takes so long)
+        else:
+            for thunk in ([self.run_thunk] * args.runs):
+                log(f"dev run {len(self.runs) + 1}/{args.runs}")
+                run = time(thunk)
+                self.runs = self.runs + [run]
+                remaining = self.time_remaining(self.runs, args.runs)
+                log(f"run completed in {run} seconds")
+                log(f"estimated time remaining: {remaining} seconds")
+                log(f"running {self.name} cleanup")
+                self.cleanup_thunk()
 
 def main():
     # parse command line arguments
@@ -177,6 +205,26 @@ def main():
     workspace_path = path_from([workspace_dir])
     dev_path = path_from([workspace_dir, dev_dir])
     base_path = path_from([workspace_dir, base_dir])
+    # not using workspace dir because `target` is dbt-specific
+    partial_parse_path = path_from(['target', 'partial_parse.pickle'])
+
+    # value that defines dev branch benchmark behavior
+    dev = Branch(
+        name='dev',
+        setup_thunk=lambda : remove_if_exists(partial_parse_path),
+        run_thunk=lambda : subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt parse"),
+        cleanup_thunk=lambda : remove_if_exists(partial_parse_path),
+        time_remaining=lambda l,n : int(round(mean(l) * ((2 * n) - len(l)), 0))
+    )
+
+    # value that defines base branch benchmark behavior
+    base = Branch(
+        name='base',
+        setup_thunk=lambda : remove_if_exists(partial_parse_path),
+        run_thunk=lambda : subprocess_with_errs(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt parse"),
+        cleanup_thunk=lambda : remove_if_exists(partial_parse_path),
+        time_remaining=lambda l,n : int(round(mean(l) * (n - len(l)), 0))
+    )
 
     if not args.cached:
         log('setting up directories') 
@@ -205,8 +253,6 @@ def main():
         subprocess_with_errs(f"cd {dev_path} && python3 -m venv env")
         subprocess_with_errs(f"cd {base_path} && python3 -m venv env")
 
-    # upgrade pip and install branches
-    if not args.cached:
         # upgrade pip
         subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
         subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
@@ -217,44 +263,17 @@ def main():
         log('installing base branch')
         subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
     
-    # define thunks that run the dbt command when evaluated
-    dev_thunk = lambda : subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
-    base_thunk = lambda : subprocess_with_errs(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt {args.command}")
-
-    # mean and median thow on empty list inputs
-    # to speed up development time, allow empty runs as a special case.
-    if args.runs < 1:
-        dev_runs = [1.0] * 10
-        base_runs = [1.0] * 10
-    # complete the runs (this is what takes so long)
-    else:
-        log('running dev branch')
-        dev_runs = []
-        for thunk in ([dev_thunk] * args.runs):
-            log(f"dev run {len(dev_runs) + 1}/{args.runs}")
-            run = time(thunk)
-            dev_runs = dev_runs + [run]
-            remaining = int(round(mean(dev_runs) * ((2 * args.runs) - len(dev_runs)), 0))
-            log(f"run completed in {run} seconds")
-            log(f"estimated time remaining: {remaining} seconds")
-
-        log('running base branch')
-        base_runs = []
-        for thunk in ([base_thunk] * args.runs):
-            log(f"base run {len(base_runs) + 1}/{args.runs}")
-            run = time(thunk)
-            base_runs = base_runs + [run]
-            remaining = int(round(mean(base_runs) * (args.runs - len(base_runs)), 0))
-            log(f"run completed in {run} seconds")
-            log(f"estimated time remaining: {remaining} seconds")
+    # run benchmarks. This takes a long time.
+    dev.run_branch(args)
+    base.run_branch(args)
     
     # output timer information and comparison math.
     print()
-    print_results(gather_output(args, dev_runs, base_runs))
+    print_results(gather_output(args, dev.runs, base.runs))
 
     # print raw runtimes
-    print(f"raw dev_runs:  {dev_runs}")
-    print(f"raw base_runs: {base_runs}")
+    print(f"raw dev_runs:  {dev.runs}")
+    print(f"raw base_runs: {base.runs}")
     print()
  
 
