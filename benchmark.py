@@ -178,7 +178,7 @@ class Branch():
         # complete the runs (this is what takes so long)
         else:
             for thunk in ([self.run_thunk] * args.runs):
-                log(f"dev run {len(self.runs) + 1}/{args.runs}")
+                log(f"{self.name} run {len(self.runs) + 1}/{args.runs}")
                 run = time(thunk)
                 self.runs = self.runs + [run]
                 remaining = self.time_remaining(self.runs, args.runs)
