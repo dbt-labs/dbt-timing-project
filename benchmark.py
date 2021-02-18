@@ -167,25 +167,25 @@ class Branch():
         self.time_remaining = time_remaining
         self.runs = []
 
-    def run_branch(self, args):
-        log(f"running {self.name} branch setup")
-        self.setup_thunk()
-        # mean and median thow on empty list inputs
-        # to speed up development time, allow empty runs as a special case.
-        if args.runs < 1:
-            self.runs = [1.0] * 10
-            self.runs = [1.0] * 10
-        # complete the runs (this is what takes so long)
-        else:
-            for thunk in ([self.run_thunk] * args.runs):
-                log(f"{self.name} run {len(self.runs) + 1}/{args.runs}")
-                run = time(thunk)
-                self.runs = self.runs + [run]
-                remaining = self.time_remaining(self.runs, args.runs)
-                log(f"run completed in {run} seconds")
-                log(f"estimated time remaining: {remaining} seconds")
-                log(f"running {self.name} cleanup")
-                self.cleanup_thunk()
+def run_branch(branch, args):
+    log(f"running {branch.name} branch setup")
+    branch.setup_thunk()
+    # mean and median thow on empty list inputs
+    # to speed up development time, allow empty runs as a special case.
+    if args.runs < 1:
+        branch.runs = [1.0] * 10
+        branch.runs = [1.0] * 10
+    # complete the runs (this is what takes so long)
+    else:
+        for thunk in ([branch.run_thunk] * args.runs):
+            log(f"{branch.name} run {len(branch.runs) + 1}/{args.runs}")
+            run = time(thunk)
+            branch.runs = branch.runs + [run]
+            remaining = branch.time_remaining(branch.runs, args.runs)
+            log(f"run completed in {run} seconds")
+            log(f"estimated time remaining: {remaining} seconds")
+            log(f"running {branch.name} cleanup")
+            branch.cleanup_thunk()
 
 def main():
     # parse command line arguments
@@ -264,8 +264,8 @@ def main():
         subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
     
     # run benchmarks. This takes a long time.
-    dev.run_branch(args)
-    base.run_branch(args)
+    run_branch(dev, args)
+    run_branch(base, args)
     
     # output timer information and comparison math.
     print()
