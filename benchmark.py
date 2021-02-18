@@ -159,8 +159,9 @@ def log(msg):
     print(f"{ts}  {msg}")
 
 class Branch():
-    def __init__(self, name, setup_thunk, run_thunk, cleanup_thunk, time_remaining):
+    def __init__(self, name, git_branch, setup_thunk, run_thunk, cleanup_thunk, time_remaining):
         self.name = name
+        self.git_branch = git_branch
         self.setup_thunk = setup_thunk
         self.run_thunk = run_thunk
         self.cleanup_thunk = cleanup_thunk
@@ -211,6 +212,7 @@ def main():
     # value that defines dev branch benchmark behavior
     dev = Branch(
         name='dev',
+        git_branch=args.dev,
         setup_thunk=lambda : remove_if_exists(partial_parse_path),
         run_thunk=lambda : subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt parse"),
         cleanup_thunk=lambda : remove_if_exists(partial_parse_path),
@@ -220,6 +222,7 @@ def main():
     # value that defines base branch benchmark behavior
     base = Branch(
         name='base',
+        git_branch=args.base,
         setup_thunk=lambda : remove_if_exists(partial_parse_path),
         run_thunk=lambda : subprocess_with_errs(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt parse"),
         cleanup_thunk=lambda : remove_if_exists(partial_parse_path),
@@ -241,12 +244,12 @@ def main():
         git.Repo.clone_from(
             'git@github.com:fishtown-analytics/dbt',
             dev_path,
-            branch=args.dev
+            branch=dev.git_branch
         )
         git.Repo.clone_from(
             'git@github.com:fishtown-analytics/dbt',
             base_path,
-            branch=args.base
+            branch=base.git_branch
         )
 
         # create virtual environments
