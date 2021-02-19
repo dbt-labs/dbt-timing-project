@@ -158,9 +158,11 @@ def log(msg):
     ts = datetime.datetime.now().strftime('%H:%M:%S')
     print(f"{ts}  {msg}")
 
-class Branch():
-    def __init__(self, name, git_branch, setup_thunk, run_thunk, cleanup_thunk, time_remaining):
+class Run():
+    def __init__(self, name, path, run_count, git_branch, setup_thunk, run_thunk, cleanup_thunk, time_remaining):
         self.name = name
+        self.path = path
+        self.run_count = run_count
         self.git_branch = git_branch
         self.setup_thunk = setup_thunk
         self.run_thunk = run_thunk
@@ -168,25 +170,65 @@ class Branch():
         self.time_remaining = time_remaining
         self.runs = []
 
-def run_branch(branch, args):
+def execute_run(branch):
     log(f"running {branch.name} branch setup")
     branch.setup_thunk()
     # mean and median thow on empty list inputs
     # to speed up development time, allow empty runs as a special case.
-    if args.runs < 1:
+    if branch.run_count < 1:
         branch.runs = [1.0] * 10
         branch.runs = [1.0] * 10
     # complete the runs (this is what takes so long)
     else:
-        for thunk in ([branch.run_thunk] * args.runs):
-            log(f"{branch.name} run {len(branch.runs) + 1}/{args.runs}")
+        for thunk in ([branch.run_thunk] * branch.run_count):
+            log(f"{branch.name} run {len(branch.runs) + 1}/{branch.run_count}")
             run = time(thunk)
             branch.runs = branch.runs + [run]
-            remaining = branch.time_remaining(branch.runs, args.runs)
+            remaining = branch.time_remaining(branch.runs, branch.run_count)
             log(f"run completed in {run} seconds")
             log(f"estimated time remaining: {remaining} seconds")
             log(f"running {branch.name} cleanup")
             branch.cleanup_thunk()
+
+def setup(workspace_path, dev_run, base_run):
+    log('setting up directories') 
+
+    dev_path = dev_run.path
+    base_path = base_run.path
+
+    # set up workspace directories
+    create_if_doesnt_exist(workspace_path)
+    remove_and_recreate_dir(dev_path)
+    remove_and_recreate_dir(base_path)
+
+    log('cloning both branches with local identity')
+    log('may ask for ssh password twice (once for each branch)')
+
+    # clone branches
+    git.Repo.clone_from(
+        'git@github.com:fishtown-analytics/dbt',
+        dev_path,
+        branch=dev_run.git_branch
+    )
+    git.Repo.clone_from(
+        'git@github.com:fishtown-analytics/dbt',
+        base_path,
+        branch=base_run.git_branch
+    )
+
+    # create virtual environments
+    subprocess_with_errs(f"cd {dev_path} && python3 -m venv env")
+    subprocess_with_errs(f"cd {base_path} && python3 -m venv env")
+
+    # upgrade pip
+    subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
+    subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
+    
+    # install branches
+    log('installing dev branch')
+    subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
+    log('installing base branch')
+    subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
 
 def main():
     # parse command line arguments
@@ -210,8 +252,10 @@ def main():
     partial_parse_path = path_from(['target', 'partial_parse.pickle'])
 
     # value that defines dev branch benchmark behavior
-    dev = Branch(
+    dev = Run(
         name='dev',
+        path=dev_path,
+        run_count=args.runs,
         git_branch=args.dev,
         setup_thunk=lambda : remove_if_exists(partial_parse_path),
         run_thunk=lambda : subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && cd ../.. && dbt parse"),
@@ -220,8 +264,10 @@ def main():
     )
 
     # value that defines base branch benchmark behavior
-    base = Branch(
+    base = Run(
         name='base',
+        path=base_path,
+        run_count=args.runs,
         git_branch=args.base,
         setup_thunk=lambda : remove_if_exists(partial_parse_path),
         run_thunk=lambda : subprocess_with_errs(f"cd {base_path} && source env/bin/activate && cd ../.. && dbt parse"),
@@ -229,46 +275,13 @@ def main():
         time_remaining=lambda l,n : int(round(mean(l) * (n - len(l)), 0))
     )
 
+    # if the cache flag is present, don't run the setup
     if not args.cached:
-        log('setting up directories') 
-
-        # set up workspace directories
-        create_if_doesnt_exist(workspace_path)
-        remove_and_recreate_dir(dev_path)
-        remove_and_recreate_dir(base_path)
-
-        log('cloning both branches with local identity')
-        log('may ask for ssh password twice (once for each branch)')
-
-        # clone branches
-        git.Repo.clone_from(
-            'git@github.com:fishtown-analytics/dbt',
-            dev_path,
-            branch=dev.git_branch
-        )
-        git.Repo.clone_from(
-            'git@github.com:fishtown-analytics/dbt',
-            base_path,
-            branch=base.git_branch
-        )
-
-        # create virtual environments
-        subprocess_with_errs(f"cd {dev_path} && python3 -m venv env")
-        subprocess_with_errs(f"cd {base_path} && python3 -m venv env")
-
-        # upgrade pip
-        subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install --upgrade pip")
-        subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install --upgrade pip")
-        
-        # install branches
-        log('installing dev branch')
-        subprocess_with_errs(f"cd {dev_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
-        log('installing base branch')
-        subprocess_with_errs(f"cd {base_path} && source env/bin/activate && pip install -r requirements.txt -r dev_requirements.txt")
+        setup(workspace_path, dev, base)
     
     # run benchmarks. This takes a long time.
-    run_branch(dev, args)
-    run_branch(base, args)
+    execute_run(dev)
+    execute_run(base)
     
     # output timer information and comparison math.
     print()
