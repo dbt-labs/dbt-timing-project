@@ -77,20 +77,14 @@ def improvement(base, better):
     return 100 * ((base - better) / base)
 
 def print_results(kvs):
-    def pair_to_line(padding_char, kv):
+    def pair_to_line(full_width, kv):
         if kv[1] is None:
             padding_size = ceil((full_width - len(kv[0])) / 2)
-            padding = ''.join([padding_char] * (padding_size))
+            padding = ''.join([kv[2]] * (padding_size))
             return padding + kv[0] + padding
         else:
-            padding = ''.join([padding_char] * (full_width - len(kv[0]) - len(kv[1])))
+            padding = ''.join([kv[2]] * (full_width - len(kv[0]) - len(kv[1])))
             return kv[0] + padding + kv[1]
-
-    def padding_char_from_value(v):
-        if v is None:
-            return ' '
-        else:
-            return '.'
     
     # measure the length of None as zero
     def len_none_is_zero(x):
@@ -106,14 +100,19 @@ def print_results(kvs):
         else:
             return len(kv[0])
 
+    # add header line
+    kvs = [('  Benchmark stats  ', None, ':')] + kvs
+
+    min_separation = 6
+
     max_key_width = reduce(lambda x,y: max(x, key_len_of_non_none_values(y)), kvs, 0)
     max_value_width = reduce(lambda x,y: max(x, len_none_is_zero(y[1])), kvs, 0)
-    # extra added defines minimum separator width
-    full_width = max_key_width + max_value_width + 4
-
-    # create list of lines to print
-    header = pair_to_line(':', ('  Benchmark stats  ', None))
-    lines = [header] + list(map(lambda pair: pair_to_line(padding_char_from_value(pair[1]), pair), kvs))
+    lines = list(map(lambda x: pair_to_line(min_separation + max_key_width + max_value_width, x), kvs))
+    
+    # when trying to center both an even and an odd string one of their right paddings has to get truncated
+    line_lengths = list(map(len, lines))
+    full_width = line_lengths[len(line_lengths) - 2]
+    lines = list(map(lambda line: line[0:full_width], lines))
     
     # print all the lines
     for line in lines:
@@ -125,14 +124,14 @@ def get_stat(name, dev, base):
     percent = round(improvement(base, dev), 2)
 
     lines = [
-        (f"{name} dev", f"{dev}"),
-        (f"{name} base", f"{base}")
+        (f"{name} dev", f"{dev}", '.'),
+        (f"{name} base", f"{base}", '.')
     ]
 
     if percent > 0:
-        return lines + [('IMPROVED BY', f"{percent} "), ("", None)]
+        return lines + [('IMPROVED BY', f"{percent} ", '.'), ('', None, ' ')]
     else:
-        return lines + [('DEGRADED BY', f"{abs(percent)} %"), ("", None)]
+        return lines + [('DEGRADED BY', f"{abs(percent)} %", '.'), ('', None, ' ')]
 
 def gather_output(args, dev, base):
     # mutably sort by reference
@@ -141,12 +140,12 @@ def gather_output(args, dev, base):
 
     # return the list of lines
     return [
-        ('command', 'dbt parse'),
-        ('dev branch', f"dbt/{args.dev}"),
-        ('base branch', f"dbt/{args.base}"),
-        ('', None),
-        ('time measured in seconds', None),
-        ('', None) 
+        ('command', 'dbt parse', '.'),
+        ('dev branch', f"dbt/{args.dev}", '.'),
+        ('base branch', f"dbt/{args.base}", '.'),
+        ('', None, ' '),
+        ('time measured in seconds', None, ' '),
+        ('', None, ' ') 
     ] \
         + get_stat('mean', round(mean(dev), 2), round(mean(base), 2)) \
         + get_stat('median', round(median(dev), 2), round(median(base), 2))
