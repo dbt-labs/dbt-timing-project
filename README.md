@@ -66,3 +66,4 @@ to benchmark large projects generate ~2000 files.
 ## Future Improvements
 - right now only the `dbt parse` command is supported. the project could be abstracted further to allow for abritrary commands to be benchmarked. a config file outlining instructions for installation, setup, running, and cleanup would be necessary.
 - when using `--cached` the last two parameters do nothing but are still required. it should check that those names match the cloned repositories.
+- add an additional flag `--partial` that benchmarks partial tests. It will do a pre-run to generate the partial parse file then measure the runs from there without deleting the file
