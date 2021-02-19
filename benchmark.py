@@ -169,6 +169,14 @@ class Run():
         self.time_remaining = time_remaining
         self.runs = []
 
+def time_string(seconds):
+    if seconds > 3600:
+        return f"{ceil(seconds / 3600)} hours"
+    elif seconds > 60:
+        return f"{ceil(seconds / 60)} minutes"
+    else:
+        return f"{seconds} seconds"
+
 def execute_run(branch):
     log(f"running {branch.name} branch setup")
     branch.setup_thunk()
@@ -185,7 +193,7 @@ def execute_run(branch):
             branch.runs = branch.runs + [run]
             remaining = branch.time_remaining(branch.runs, branch.run_count)
             log(f"run completed in {run} seconds")
-            log(f"estimated time remaining: {remaining} seconds")
+            log(f"estimated time remaining: {time_string(remaining)}")
             log(f"running {branch.name} cleanup")
             branch.cleanup_thunk()
 
