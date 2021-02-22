@@ -64,6 +64,8 @@ python3 benchmark.py --cached --runs=25 my-branch develop
 to benchmark large projects generate ~2000 files.
 
 ## Future Improvements
+- add hypothesis testing to identify if the change is statistically significant with respect to the variance of the set. Will have to address sample sizes that are too small.
 - right now only the `dbt parse` command is supported. the project could be abstracted further to allow for abritrary commands to be benchmarked. a config file outlining instructions for installation, setup, running, and cleanup would be necessary.
+- config file could outline "subcommands" if a process can be broken up into several serial commands for more fine-grained results.
 - when using `--cached` the last two parameters do nothing but are still required. it should check that those names match the cloned repositories.
 - add an additional flag `--partial` that benchmarks partial tests. It will do a pre-run to generate the partial parse file then measure the runs from there without deleting the file
