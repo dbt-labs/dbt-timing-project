@@ -31,7 +31,6 @@ def gen_schema(node_name):
                             "not_null",
                             {
                                 "relationships": {
-                                    "from": "id",
                                     "to": "node_0",
                                     "field": "id"
                                 }
