@@ -51,7 +51,7 @@ def gen_config(noisy=False):
     db_rng = randrange(5)
     schema_rng = randrange(db_rng + (3 if noisy else 1))
     
-    enabled = "var('add_noise', True)" if noisy else "True"
+    enabled = "var('add_noise', False)" if noisy else "True"
     database = f"('bigdb{db_rng}' if target.type in ('snowflake', 'bigquery') else target.get('database'))"
     schema = f"bigschema{schema_rng}"
     rand_mat = "view" if randrange(2) == 0 else "table"
@@ -61,7 +61,8 @@ def gen_config(noisy=False):
         enabled={enabled},
         database={database},
         schema='{schema}',
-        materialized='{rand_mat}'
+        materialized='{rand_mat}',
+        file_format='delta'
     )
     """
     wrapped = "{{" + config + "}}"
@@ -73,7 +74,7 @@ def gen_sql(edges=None, noisy=False):
     contents = f"""
     {config}
     
-    select 1 as id
+    select 1 as fun, 'blue' as hue, true as is_cool, '2022-01-01' as date_day
     """
     if edges:
         for _, edge_id in edges:
