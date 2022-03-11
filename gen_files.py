@@ -5,6 +5,7 @@ import networkx as nx
 import yaml
 import os
 import argparse
+import random
 
 
 # overrides error behavior for arg parser
@@ -16,6 +17,9 @@ class MyParser(argparse.ArgumentParser):
 
 def gen_name(i):
     return "node_{}".format(i)
+    
+def gen_noisy_name(i):
+    return "noisy_node_{}".format(i)
 
 def gen_schema(node_name):
     return {
@@ -42,13 +46,42 @@ def gen_schema(node_name):
         ]
     }
 
-def gen_sql(edges):
-    contents = "select 1 as id"
-    for _, edge_id in edges:
-        edge_name = gen_name(edge_id)
-        contents += "\nunion all\n"
-        contents += "select * from {{ ref('" + edge_name + "') }}"
+def gen_config(noisy=False):
+    from random import randrange
+    db_rng = randrange(5)
+    schema_rng = randrange(db_rng + (3 if noisy else 1))
+    
+    enabled = "var('add_noise', True)" if noisy else "True"
+    database = f"('bigdb{db_rng}' if target.type in ('snowflake', 'bigquery') else target.get('database'))"
+    schema = f"bigschema{schema_rng}"
+    rand_mat = "view" if randrange(2) == 0 else "table"
+    
+    config = f"""
+    config(
+        enabled={enabled},
+        database={database},
+        schema='{schema}',
+        materialized='{rand_mat}'
+    )
+    """
+    wrapped = "{{" + config + "}}"
+    return wrapped
+
+
+def gen_sql(edges=None, noisy=False):
+    config = gen_config(noisy)
+    contents = f"""
+    {config}
+    
+    select 1 as id
+    """
+    if edges:
+        for _, edge_id in edges:
+            edge_name = gen_name(edge_id)
+            contents += "\nunion all\n"
+            contents += "select * from {{ ref('" + edge_name + "') }}"
     return contents
+
 
 def main():
     parser = MyParser(description='Generate a dbt project')
@@ -83,6 +116,26 @@ def main():
 
         with open(test_path, 'w') as fh:
             fh.write(yaml.dump(schema))
+
+    # create noisy objects in the same database locations
+    for noisy_id in range(GRAPH_SIZE):
+        noisy_name = gen_noisy_name(noisy_id)
+        contents = gen_sql(noisy=True)
+        path_dir = "noisy_path_{}".format(noisy_id // 10)
+        path = "models/{}/{}.{}"
+        model_path = path.format(path_dir, noisy_name, 'sql')
+    
+        try:
+            os.makedirs("models/{}".format(path_dir))
+        except FileExistsError:
+            pass
+
+        with open(model_path, 'w') as fh:
+            fh.write(contents)
+
+        with open(test_path, 'w') as fh:
+            fh.write(yaml.dump(schema))
+        
 
     print("Done.")
     print()
